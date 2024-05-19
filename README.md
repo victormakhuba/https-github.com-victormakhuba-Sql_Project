@@ -15,7 +15,8 @@ Tableau for data visualization
 Microsoft SQL Server Management Studio (SSMS) for SQL query execution and analysis
 
 ## Repository Link
-COVID-19 Data Analysis on GitHub
+[COVID-19 Data Analysis on GitHub](https://github.com/victormakhuba/https-github.com-victormakhuba-Projects/blob/main/Supermarket-Sales.ipynb)
+
 
 Feel free to explore the SQL scripts and Tableau visualizations in the repository to see the detailed analysis and the methodologies applied in this project.
 
