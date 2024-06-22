@@ -1,45 +1,45 @@
--- Create temporary tables for intermediate results
-CREATE TABLE #ClassificationCounts (
-    CLASIFFICATION_FINAL INT,
-    ClassificationCount INT
+#Create temporary tables for intermediate results
+CREATE TABLE #TempClassificationCounts (
+    Classification INT,
+    Count INT
 );
 
-CREATE TABLE #GenderAgeGroupCounts (
+CREATE TABLE #TempGenderAgeGroups (
     Gender NVARCHAR(10),
     AgeGroup NVARCHAR(10),
-    DemographicCount INT
+    Count INT
 );
 
-CREATE TABLE #MortalityRates (
+CREATE TABLE #TempMortalityRates (
     Gender NVARCHAR(10),
     MortalityRate FLOAT
 );
 
-CREATE TABLE #ResourceUsage (
+CREATE TABLE #TempResourceUsage (
     Resource NVARCHAR(10),
     UsageRate FLOAT
 );
 
-CREATE TABLE #ComorbidityMortality (
+CREATE TABLE #TempComorbidityMortality (
     Condition NVARCHAR(15),
     ConditionValue INT,
     MortalityRate FLOAT
 );
 
--- Populate #ClassificationCounts
-INSERT INTO #ClassificationCounts
+-- Populate #TempClassificationCounts
+INSERT INTO #TempClassificationCounts
 SELECT 
     CLASIFFICATION_FINAL, 
-    COUNT(*) AS ClassificationCount
+    COUNT(*) AS Count
 FROM dbo.Covid19_Data
 GROUP BY CLASIFFICATION_FINAL;
 
--- Populate #GenderAgeGroupCounts
-INSERT INTO #GenderAgeGroupCounts
+#Populate #TempGenderAgeGroups
+INSERT INTO #TempGenderAgeGroups
 SELECT 
-    CASE SEX 
-        WHEN 1 THEN 'Male' 
-        WHEN 2 THEN 'Female' 
+    CASE 
+        WHEN SEX = 1 THEN 'Male' 
+        WHEN SEX = 2 THEN 'Female' 
         ELSE 'Other' 
     END AS Gender,
     CASE 
@@ -47,10 +47,9 @@ SELECT
         WHEN AGE BETWEEN 19 AND 30 THEN '19-30'
         WHEN AGE BETWEEN 31 AND 50 THEN '31-50'
         WHEN AGE BETWEEN 51 AND 70 THEN '51-70'
-        WHEN AGE > 70 THEN '71+'
-        ELSE 'Unknown' 
+        ELSE '71+' 
     END AS AgeGroup,
-    COUNT(*) AS DemographicCount
+    COUNT(*) AS Count
 FROM dbo.Covid19_Data
 GROUP BY SEX, 
     CASE 
@@ -58,24 +57,23 @@ GROUP BY SEX,
         WHEN AGE BETWEEN 19 AND 30 THEN '19-30'
         WHEN AGE BETWEEN 31 AND 50 THEN '31-50'
         WHEN AGE BETWEEN 51 AND 70 THEN '51-70'
-        WHEN AGE > 70 THEN '71+'
-        ELSE 'Unknown'
+        ELSE '71+' 
     END;
 
--- Populate #MortalityRates
-INSERT INTO #MortalityRates
+#Populate #TempMortalityRates
+INSERT INTO #TempMortalityRates
 SELECT 
-    CASE SEX 
-        WHEN 1 THEN 'Male' 
-        WHEN 2 THEN 'Female' 
+    CASE 
+        WHEN SEX = 1 THEN 'Male' 
+        WHEN SEX = 2 THEN 'Female' 
         ELSE 'Other' 
     END AS Gender,
     (SUM(CASE WHEN DATE_DIED != '9999-99-99' THEN 1 ELSE 0 END) * 1.0 / COUNT(*)) AS MortalityRate
 FROM dbo.Covid19_Data
 GROUP BY SEX;
 
--- Populate #ResourceUsage
-INSERT INTO #ResourceUsage
+#Populate #TempResourceUsage
+INSERT INTO #TempResourceUsage
 SELECT 
     'Intubated' AS Resource,
     (SUM(CASE WHEN INTUBED = 1 THEN 1 ELSE 0 END) * 1.0 / COUNT(*)) AS UsageRate
@@ -86,8 +84,8 @@ SELECT
     (SUM(CASE WHEN ICU = 1 THEN 1 ELSE 0 END) * 1.0 / COUNT(*)) AS UsageRate
 FROM dbo.Covid19_Data;
 
--- Populate #ComorbidityMortality
-INSERT INTO #ComorbidityMortality
+#Populate #TempComorbidityMortality
+INSERT INTO #TempComorbidityMortality
 SELECT 
     'Diabetes' AS Condition,
     DIABETES AS ConditionValue,
@@ -104,10 +102,10 @@ GROUP BY HIPERTENSION
 UNION ALL
 SELECT 
     'Obesity' AS Condition,
-    OBESITY AS ConditionValue,
+    OBESIDAD AS ConditionValue,
     (SUM(CASE WHEN DATE_DIED != '9999-99-99' THEN 1 ELSE 0 END) * 1.0 / COUNT(*)) AS MortalityRate
 FROM dbo.Covid19_Data
-GROUP BY OBESITY
+GROUP BY OBESIDAD
 UNION ALL
 SELECT 
     'Cardiovascular' AS Condition,
@@ -116,13 +114,13 @@ SELECT
 FROM dbo.Covid19_Data
 GROUP BY CARDIOVASCULAR;
 
--- Final SELECT to create a consolidated view of the data
+#Final SELECT to create a consolidated view of the data
 SELECT 
-    cc.CLASIFFICATION_FINAL,
-    cc.ClassificationCount,
+    cc.Classification,
+    cc.Count AS ClassificationCount,
     gag.Gender,
     gag.AgeGroup,
-    gag.DemographicCount,
+    gag.Count AS DemographicCount,
     mr.MortalityRate AS GenderMortalityRate,
     ru.Resource,
     ru.UsageRate,
@@ -132,22 +130,22 @@ SELECT
     CASE 
         WHEN cd.DATE_DIED = '9999-99-99' THEN NULL
         ELSE CONVERT(varchar, cd.DATE_DIED, 23)
-    END AS DateDied, -- Ensure DATE_DIED is formatted as YYYY-MM-DD
+    END AS DateDied,
     CASE 
         WHEN cd.DATE_DIED = '9999-99-99' THEN 'Alive'
         ELSE 'Deceased'
     END AS AliveStatus
-FROM #ClassificationCounts cc
-LEFT JOIN #GenderAgeGroupCounts gag ON 1=1 -- Cartesian join for independent aggregates
-LEFT JOIN #MortalityRates mr ON 1=1
-LEFT JOIN #ResourceUsage ru ON 1=1
-LEFT JOIN #ComorbidityMortality cm ON 1=1
-LEFT JOIN dbo.Covid19_Data cd ON cc.CLASIFFICATION_FINAL = cd.CLASIFFICATION_FINAL
-ORDER BY cc.CLASIFFICATION_FINAL, gag.Gender, gag.AgeGroup, ru.Resource;
+FROM #TempClassificationCounts cc
+LEFT JOIN #TempGenderAgeGroups gag ON 1=1
+LEFT JOIN #TempMortalityRates mr ON 1=1
+LEFT JOIN #TempResourceUsage ru ON 1=1
+LEFT JOIN #TempComorbidityMortality cm ON 1=1
+LEFT JOIN dbo.Covid19_Data cd ON cc.Classification = cd.CLASIFFICATION_FINAL
+ORDER BY cc.Classification, gag.Gender, gag.AgeGroup, ru.Resource;
 
--- Drop temporary tables
-DROP TABLE #ClassificationCounts;
-DROP TABLE #GenderAgeGroupCounts;
-DROP TABLE #MortalityRates;
-DROP TABLE #ResourceUsage;
-DROP TABLE #ComorbidityMortality;
+#Drop temporary tables
+DROP TABLE #TempClassificationCounts;
+DROP TABLE #TempGenderAgeGroups;
+DROP TABLE #TempMortalityRates;
+DROP TABLE #TempResourceUsage;
+DROP TABLE #TempComorbidityMortality;
